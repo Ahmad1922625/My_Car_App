@@ -2,12 +2,11 @@ package com.MyCarApp.modules.door_control
 
 import com.MyCarApp.core.OutputObject
 import com.MyCarApp.core.PropertyResult
+import com.MyCarApp.core.VehiclePropertyProvider
 import com.MyCarApp.modules.BaseModule
-import android.car.hardware.property.CarPropertyManager
-import android.car.hardware.CarPropertyValue
 
 /**
- * DoorControlModule handles door operations using CarPropertyManager.
+ * DoorControlModule handles door operations using VehiclePropertyProvider.
  * It wraps HAL calls into high-level methods:
  *  - getDoorState(): Retrieves lock status and door position.
  *  - unlockDoor(): Unlocks the driver's door.
@@ -27,10 +26,10 @@ import android.car.hardware.CarPropertyValue
  *  - Handle vendor-specific configurations.
  *
  * Testing Coverage:
- *  - Write unit tests that mock CarPropertyManager and verify calls to getProperty and setProperty.
+ *  - Write unit tests that mock VehiclePropertyProvider and verify calls to get/set property methods.
  *  - Validate that error cases (null/exception) produce error outputs.
  */
-class DoorControlModule(private val carPropertyManager: CarPropertyManager) : BaseModule("door_control") {
+open class DoorControlModule(private val propertyProvider: VehiclePropertyProvider) : BaseModule("door_control") {
 
     // For testing: use area id 0 for emulator compatibility.
     private val row1Left = 0
@@ -58,21 +57,15 @@ class DoorControlModule(private val carPropertyManager: CarPropertyManager) : Ba
     }
 
     /**
-     * Retrieves the door state by querying CarPropertyManager.
+     * Retrieves the door state by querying VehiclePropertyProvider.
      * Returns lock status (Boolean) and door position (Int).
      *
      * Adds error handling for null or exception cases using PropertyResult.
      */
     fun getDoorState(): OutputObject {
         return try {
-            // Retrieve property values.
-            val rawLock = carPropertyManager.getProperty(Boolean::class.java, ID_DOOR_LOCK, row1Left)
-            val rawDoor = carPropertyManager.getProperty(Int::class.java, ID_DOOR_MOVE, row1Left)
-
-            // Directly extract the value (the casts are unnecessary).
-            val lockStatus: Boolean? = rawLock?.value
-            val doorPosition: Int? = rawDoor?.value
-
+            val lockStatus = propertyProvider.getDoorLockStatus(row1Left)
+            val doorPosition = propertyProvider.getDoorPosition(row1Left)
             val additionalData: Map<String, PropertyResult<Any>> = mapOf(
                 "lockStatus" to (lockStatus?.let { PropertyResult.Success(it) }
                     ?: PropertyResult.Error("Lock status not available")),
@@ -104,14 +97,14 @@ class DoorControlModule(private val carPropertyManager: CarPropertyManager) : Ba
 
     /**
      * Unlocks the driver's door.
-     * Calls setProperty with false for the lock.
+     * Calls setDoorLock(false) on the VehiclePropertyProvider.
      *
      * Includes error handling using PropertyResult to produce an error output if an exception occurs.
      */
     fun unlockDoor() {
         println("Door Control Module: Unlocking door...")
         try {
-            carPropertyManager.setProperty(Boolean::class.java, ID_DOOR_LOCK, row1Left, false)
+            propertyProvider.setDoorLock(row1Left, false)
             val output = OutputObject(
                 moduleId = moduleId,
                 result = "DoorUnlocked",
@@ -135,14 +128,14 @@ class DoorControlModule(private val carPropertyManager: CarPropertyManager) : Ba
 
     /**
      * Opens the driver's door.
-     * Issues a command to open and waits for movement to complete.
+     * Calls setDoorMove(1) on the VehiclePropertyProvider and waits for movement to complete.
      *
      * Includes error handling using PropertyResult to produce an error output if an exception occurs.
      */
     fun openDoor() {
         println("Door Control Module: Opening door...")
         try {
-            carPropertyManager.setProperty(Int::class.java, ID_DOOR_MOVE, row1Left, 1)
+            propertyProvider.setDoorMove(row1Left, 1)
             // Simulate waiting for door movement to complete.
             Thread.sleep(500)
             println("Door Control Module: Door movement complete.")
