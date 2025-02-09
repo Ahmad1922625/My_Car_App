@@ -1,6 +1,7 @@
 package com.MyCarApp.modules.facial_recognition
 
 import com.MyCarApp.core.OutputObject
+import com.MyCarApp.core.PropertyResult
 import com.MyCarApp.modules.BaseModule
 
 open class FacialRecognitionModule(moduleId: String) : BaseModule(moduleId) {
@@ -11,12 +12,14 @@ open class FacialRecognitionModule(moduleId: String) : BaseModule(moduleId) {
         // Simulated face recognition logic
         val matchResult = "MatchFound"
 
-        // Prepare the output object
+        // Prepare the output object with the correct type for additionalData
         val output = OutputObject(
             moduleId = moduleId,
             result = matchResult,
             status = true,
-            additionalData = mapOf("personName" to "John Doe")
+            additionalData = mapOf(
+                "personName" to PropertyResult.Success("John Doe")
+            )
         )
 
         println("Facial Recognition Module: OutputObject prepared -> $output")
@@ -25,6 +28,3 @@ open class FacialRecognitionModule(moduleId: String) : BaseModule(moduleId) {
         notifyCompletion(output)
     }
 }
-
-
-

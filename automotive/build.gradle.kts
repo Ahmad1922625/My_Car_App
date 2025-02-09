@@ -6,6 +6,7 @@ plugins {
 android {
     namespace = "com.MyCarApp"
     compileSdk = 35
+    useLibrary("android.car")
 
     defaultConfig {
         applicationId = "com.MyCarApp"
