@@ -9,11 +9,11 @@ import com.MyCarApp.modules.door_control.DoorControlModule
  */
 class VehiclePropertyProviderImpl(private val carPropertyManager: CarPropertyManager) : VehiclePropertyProvider {
     override fun getDoorLockStatus(areaId: Int): Boolean? {
-        return carPropertyManager.getProperty(Boolean::class.java, DoorControlModule.ID_DOOR_LOCK, areaId)?.value as? Boolean
+        return carPropertyManager.getProperty(Boolean::class.java, DoorControlModule.ID_DOOR_LOCK, areaId)?.value
     }
 
     override fun getDoorPosition(areaId: Int): Int? {
-        return carPropertyManager.getProperty(Int::class.java, DoorControlModule.ID_DOOR_MOVE, areaId)?.value as? Int
+        return carPropertyManager.getProperty(Int::class.java, DoorControlModule.ID_DOOR_MOVE, areaId)?.value
     }
 
     override fun setDoorLock(areaId: Int, lock: Boolean) {

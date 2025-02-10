@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">MyCarApp</string>
+    <string name="welcome_message">Welcome to MyCarApp!</string>
 </resources>
