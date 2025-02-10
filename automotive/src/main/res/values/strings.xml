@@ -1,4 +1,8 @@
 <resources>
     <string name="app_name">MyCarApp</string>
     <string name="welcome_message">Welcome to MyCarApp!</string>
+    <string name="door_control">Door Control</string>
+    <string name="facial_recognition">Facial Recognition</string>
+    <string name="door_control_clicked">Door Control Clicked</string>
+    <string name="facial_recognition_clicked">Facial Recognition Clicked</string>
 </resources>

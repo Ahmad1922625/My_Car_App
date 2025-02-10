@@ -1,4 +1,11 @@
 <resources>
 
-    <style name="Theme.MyCarApp" parent="android:Theme.Material.Light.DarkActionBar" />
+    <!-- Base application theme -->
+    <style name="Theme.MyCarApp" parent="Theme.AppCompat.Light.DarkActionBar">
+        <!-- Customize your theme as needed -->
+        <item name="colorPrimary">@color/purple_500</item>
+        <item name="colorPrimaryDark">@color/purple_700</item>
+        <item name="colorAccent">@color/teal_200</item>
+    </style>
+
 </resources>
