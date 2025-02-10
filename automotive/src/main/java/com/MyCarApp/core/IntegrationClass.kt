@@ -55,6 +55,9 @@ class IntegrationClass {
         for (id in moduleRegistry.keys) {
             println("Initializing module: $id")
         }
+        if (carPropertyManager == null) {
+            println("IntegrationClass: carPropertyManager is null. Skipping door_control registration.")
+        }
         println("IntegrationClass: All modules initialized successfully.")
     }
 
@@ -83,6 +86,7 @@ class IntegrationClass {
             println("IntegrationClass: No module found with ID '$id'")
             return
         }
+        println("IntegrationClass: Registered module with ID '$id'")
         println("IntegrationClass: Executing module: $id")
         module.execute(input)
     }
