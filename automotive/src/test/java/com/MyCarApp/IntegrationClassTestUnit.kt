@@ -8,27 +8,37 @@ import com.MyCarApp.modules.facial_recognition.FacialRecognitionModule
 import org.junit.Before
 import org.junit.Test
 import org.mockito.kotlin.*
+import android.car.hardware.property.CarPropertyManager
 
 class IntegrationClassTest {
 
     private lateinit var integration: IntegrationClass
+    private lateinit var mockCarPropertyManager: CarPropertyManager
     private lateinit var mockVehiclePropertyProvider: VehiclePropertyProvider
 
     @Before
     fun setup() {
+        // Ensure a fresh instance for each test
         integration = IntegrationClass.getInstance()
-        integration.clearModules() // Ensure a clean state for each test
-        // Create a mock VehiclePropertyProvider instead of CarPropertyManager.
-        mockVehiclePropertyProvider = mock<VehiclePropertyProvider>()
+        integration.clearModules()
+
+        // Mock the CarPropertyManager and VehiclePropertyProvider
+        mockCarPropertyManager = mock()
+        mockVehiclePropertyProvider = mock()
+
+        // Set the mock CarPropertyManager in IntegrationClass
+        integration.setCarPropertyManager(mockCarPropertyManager)
     }
 
     @Test
     fun `test module registration`() {
         // Arrange
         val facialRecognition = spy(FacialRecognitionModule("facial_recognition"))
+
         // Act
         integration.registerModule("facial_recognition", facialRecognition)
-        // Assert using the public accessor
+
+        // Assert
         assert(integration.getRegisteredModules()["facial_recognition"] == facialRecognition)
     }
 
@@ -37,11 +47,14 @@ class IntegrationClassTest {
         // Arrange
         val facialRecognition = spy(FacialRecognitionModule("facial_recognition"))
         integration.registerModule("facial_recognition", facialRecognition)
-        // Stub notifyCompletion to prevent the integration chain from executing
+
+        // Prevent notifyCompletion from triggering the next module
         doNothing().whenever(facialRecognition).notifyCompletion(any())
+
         // Act
         integration.executeModule("facial_recognition", null)
-        // Assert that the module's execute method was called without triggering door control.
+
+        // Assert: Ensure the module executed without triggering door control
         verify(facialRecognition).execute(eq(null))
     }
 
@@ -50,8 +63,10 @@ class IntegrationClassTest {
         // Arrange
         val facialRecognition = spy(FacialRecognitionModule("facial_recognition"))
         val doorControl = spy(DoorControlModule(mockVehiclePropertyProvider))
+
         integration.registerModule("facial_recognition", facialRecognition)
         integration.registerModule("door_control", doorControl)
+
         // Act
         val output = OutputObject(
             moduleId = "facial_recognition",
@@ -60,7 +75,8 @@ class IntegrationClassTest {
             additionalData = null
         )
         integration.notifyModuleCompleted("facial_recognition", output)
-        // Assert: Verify that door control module was triggered with the correct input.
+
+        // Assert: Verify that door control module was triggered with correct input
         verify(doorControl).execute(argThat { out -> out.result == "MatchFound" })
     }
 
@@ -69,11 +85,14 @@ class IntegrationClassTest {
         // Arrange
         val facialRecognition = spy(FacialRecognitionModule("facial_recognition"))
         val doorControl = spy(DoorControlModule(mockVehiclePropertyProvider))
+
         integration.registerModule("facial_recognition", facialRecognition)
         integration.registerModule("door_control", doorControl)
-        // Act: Execute the facial recognition module which will automatically trigger the workflow chain.
+
+        // Act: Execute facial recognition module (triggers workflow chain)
         integration.executeModule("facial_recognition", null)
-        // Assert that facial recognition executed and then door control was triggered once.
+
+        // Assert: Ensure both modules execute in sequence
         verify(facialRecognition).execute(eq(null))
         verify(doorControl, times(1)).execute(argThat { out -> out.result == "MatchFound" })
     }
@@ -81,28 +100,33 @@ class IntegrationClassTest {
     // ----- Door Control Specific Tests -----
 
     @Test
-    fun testUnlockDoor_Success() {
-        // Arrange: stub setDoorLock on the mock provider.
+    fun `test unlockDoor success`() {
+        // Arrange
         doNothing().whenever(mockVehiclePropertyProvider).setDoorLock(eq(0), eq(false))
+
         // Act
         val doorControl = spy(DoorControlModule(mockVehiclePropertyProvider))
         doorControl.unlockDoor()
-        // Assert: Verify that setDoorLock was called with the expected parameters.
+
+        // Assert
         verify(mockVehiclePropertyProvider).setDoorLock(eq(0), eq(false))
     }
 
     @Test
-    fun testUnlockDoor_Exception() {
-        // Arrange: simulate an exception when unlocking the door.
+    fun `test unlockDoor exception handling`() {
+        // Arrange: Simulate exception when unlocking door
         whenever(mockVehiclePropertyProvider.setDoorLock(any(), eq(false)))
             .thenThrow(RuntimeException("Unlock failed"))
+
         // Act
         val doorControl = spy(DoorControlModule(mockVehiclePropertyProvider))
         doorControl.unlockDoor()
-        // Assert: capture the output passed to notifyCompletion.
+
+        // Assert: Capture the output passed to notifyCompletion
         argumentCaptor<OutputObject>().apply {
             verify(doorControl, atLeastOnce()).notifyCompletion(capture())
             val output = firstValue
+
             assert(output.result == "Error: Failed to unlock door")
             assert(!output.status)
             val additionalData = output.additionalData!!
@@ -113,28 +137,33 @@ class IntegrationClassTest {
     }
 
     @Test
-    fun testOpenDoor_Success() {
-        // Arrange: stub setDoorMove on the mock provider.
+    fun `test openDoor success`() {
+        // Arrange
         doNothing().whenever(mockVehiclePropertyProvider).setDoorMove(eq(0), eq(1))
+
         // Act
         val doorControl = spy(DoorControlModule(mockVehiclePropertyProvider))
         doorControl.openDoor()
-        // Assert: Verify that setDoorMove was called with the expected parameters.
+
+        // Assert
         verify(mockVehiclePropertyProvider).setDoorMove(eq(0), eq(1))
     }
 
     @Test
-    fun testOpenDoor_Exception() {
-        // Arrange: simulate an exception when opening the door.
+    fun `test openDoor exception handling`() {
+        // Arrange: Simulate exception when opening the door
         whenever(mockVehiclePropertyProvider.setDoorMove(any(), eq(1)))
             .thenThrow(RuntimeException("Open failed"))
+
         // Act
         val doorControl = spy(DoorControlModule(mockVehiclePropertyProvider))
         doorControl.openDoor()
-        // Assert: capture the output passed to notifyCompletion.
+
+        // Assert: Capture the output passed to notifyCompletion
         argumentCaptor<OutputObject>().apply {
             verify(doorControl, atLeastOnce()).notifyCompletion(capture())
             val output = firstValue
+
             assert(output.result == "Error: Failed to open door")
             assert(!output.status)
             val additionalData = output.additionalData!!

@@ -1,17 +1,12 @@
 package com.MyCarApp.core
 
 import android.car.hardware.property.CarPropertyManager
+import android.util.Log
 import com.MyCarApp.modules.BaseModule
 import com.MyCarApp.modules.door_control.DoorControlModule
 
 /**
- * IntegrationClass is responsible for managing module execution workflows.
- * It registers modules, executes them in a defined sequence, and handles callbacks
- * to determine the next module to run.
- *
- * For modules like DoorControlModule that require access to system-level car properties,
- * you provide a CarPropertyManager via setCarPropertyManager(), which is then wrapped
- * by VehiclePropertyProviderImpl.
+ * IntegrationClass manages module execution and module registry.
  */
 class IntegrationClass {
 
@@ -20,24 +15,14 @@ class IntegrationClass {
 
     // Optional CarPropertyManager for modules that require system-level access.
     private var carPropertyManager: CarPropertyManager? = null
-
-    /**
-     * Returns a copy of the registered modules.
-     */
-    fun getRegisteredModules(): Map<String, BaseModule> = moduleRegistry.toMap()
-
-    /**
-     * Clears the registered modules. (For testing purposes)
-     */
-    fun clearModules() {
-        moduleRegistry.clear()
-    }
+    private var vehiclePropertyProvider: VehiclePropertyProviderImpl? = null
 
     /**
      * Sets the CarPropertyManager instance for modules that require it.
      */
     fun setCarPropertyManager(manager: CarPropertyManager) {
         this.carPropertyManager = manager
+        this.vehiclePropertyProvider = VehiclePropertyProviderImpl(manager) // Assign the instance
     }
 
     /**
@@ -46,19 +31,18 @@ class IntegrationClass {
      * it automatically registers a DoorControlModule using VehiclePropertyProviderImpl.
      */
     fun initModules() {
-        println("IntegrationClass: Initializing modules...")
+        Log.d("IntegrationClass", "Initializing modules...")
         if (!moduleRegistry.containsKey("door_control") && carPropertyManager != null) {
-            // Wrap the CarPropertyManager in a VehiclePropertyProviderImpl.
             val provider = VehiclePropertyProviderImpl(carPropertyManager!!)
             registerModule("door_control", DoorControlModule(provider))
         }
-        for (id in moduleRegistry.keys) {
-            println("Initializing module: $id")
+        moduleRegistry.keys.forEach { id ->
+            Log.d("IntegrationClass", "Initializing module: $id")
         }
         if (carPropertyManager == null) {
-            println("IntegrationClass: carPropertyManager is null. Skipping door_control registration.")
+            Log.w("IntegrationClass", "carPropertyManager is null. Skipping door_control registration.")
         }
-        println("IntegrationClass: All modules initialized successfully.")
+        Log.d("IntegrationClass", "All modules initialized successfully.")
     }
 
     /**
@@ -68,11 +52,11 @@ class IntegrationClass {
      */
     fun registerModule(id: String, module: BaseModule) {
         if (moduleRegistry.containsKey(id)) {
-            println("IntegrationClass: Module with ID '$id' is already registered.")
+            Log.w("IntegrationClass", "Module with ID '$id' is already registered.")
             return
         }
         moduleRegistry[id] = module
-        println("IntegrationClass: Registered module: $id")
+        Log.d("IntegrationClass", "Registered module: $id")
     }
 
     /**
@@ -83,11 +67,10 @@ class IntegrationClass {
     fun executeModule(id: String, input: OutputObject? = null) {
         val module = moduleRegistry[id]
         if (module == null) {
-            println("IntegrationClass: No module found with ID '$id'")
+            Log.e("IntegrationClass", "No module found with ID '$id'")
             return
         }
-        println("IntegrationClass: Registered module with ID '$id'")
-        println("IntegrationClass: Executing module: $id")
+        Log.d("IntegrationClass", "Executing module: $id")
         module.execute(input)
     }
 
@@ -98,11 +81,11 @@ class IntegrationClass {
      * @param output The output object containing results from the module.
      */
     fun notifyModuleCompleted(id: String, output: OutputObject) {
-        println("IntegrationClass: Module '$id' completed with output: $output")
+        Log.d("IntegrationClass", "Module '$id' completed with output: $output")
         when (output.result) {
             "MatchFound" -> executeModule("door_control", output)
-            "NoMatch" -> println("IntegrationClass: No match found. Ending workflow.")
-            else -> println("IntegrationClass: No further actions defined for this output.")
+            "NoMatch" -> Log.d("IntegrationClass", "No match found. Ending workflow.")
+            else -> Log.d("IntegrationClass", "No further actions defined for this output.")
         }
     }
 
@@ -113,6 +96,17 @@ class IntegrationClass {
         if (!moduleRegistry.containsKey("door_control")) {
             registerModule("door_control", DoorControlModule(provider))
         }
+    }
+
+    /**
+     * Registers and unregisters door property callbacks through VehiclePropertyProvider.
+     */
+    fun registerDoorPropertyCallback() {
+        vehiclePropertyProvider?.registerDoorPropertyCallback()
+    }
+
+    fun unregisterDoorPropertyCallback() {
+        vehiclePropertyProvider?.unregisterDoorPropertyCallback()
     }
 
     companion object {

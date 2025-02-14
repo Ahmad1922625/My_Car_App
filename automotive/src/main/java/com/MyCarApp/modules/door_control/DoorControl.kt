@@ -63,9 +63,13 @@ open class DoorControlModule(private val propertyProvider: VehiclePropertyProvid
      * Adds error handling for null or exception cases using PropertyResult.
      */
     fun getDoorState(): OutputObject {
+        println("Door Control Module: Retrieving door state...")
         return try {
             val lockStatus = propertyProvider.getDoorLockStatus(row1Left)
             val doorPosition = propertyProvider.getDoorPosition(row1Left)
+
+            println("Door Control Module: Lock Status = $lockStatus, Door Position = $doorPosition")
+
             val additionalData: Map<String, PropertyResult<Any>> = mapOf(
                 "lockStatus" to (lockStatus?.let { PropertyResult.Success(it) }
                     ?: PropertyResult.Error("Lock status not available")),
@@ -81,6 +85,8 @@ open class DoorControlModule(private val propertyProvider: VehiclePropertyProvid
             notifyCompletion(output)
             output
         } catch (ex: Exception) {
+            println("Door Control Module: Error retrieving door state - ${ex.message}")
+
             val additionalData: Map<String, PropertyResult<Any>> = mapOf(
                 "exception" to PropertyResult.Error(ex.message ?: "Unknown error")
             )
@@ -95,6 +101,7 @@ open class DoorControlModule(private val propertyProvider: VehiclePropertyProvid
         }
     }
 
+
     /**
      * Unlocks the driver's door.
      * Calls setDoorLock(false) on the VehiclePropertyProvider.
@@ -105,6 +112,8 @@ open class DoorControlModule(private val propertyProvider: VehiclePropertyProvid
         println("Door Control Module: Unlocking door...")
         try {
             propertyProvider.setDoorLock(row1Left, false)
+            println("Door Control Module: Door unlocked successfully.")
+
             val output = OutputObject(
                 moduleId = moduleId,
                 result = "DoorUnlocked",
@@ -113,6 +122,8 @@ open class DoorControlModule(private val propertyProvider: VehiclePropertyProvid
             )
             notifyCompletion(output)
         } catch (ex: Exception) {
+            println("Door Control Module: Failed to unlock door - ${ex.message}")
+
             val additionalData: Map<String, PropertyResult<Any>> = mapOf(
                 "exception" to PropertyResult.Error(ex.message ?: "Unknown error")
             )
@@ -125,6 +136,7 @@ open class DoorControlModule(private val propertyProvider: VehiclePropertyProvid
             notifyCompletion(output)
         }
     }
+
 
     /**
      * Opens the driver's door.

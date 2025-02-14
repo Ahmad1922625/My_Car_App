@@ -1,8 +1,18 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.MyCarApp">
+
+    <!-- Define a custom permission to restrict who can send broadcasts -->
+    <permission android:name="com.MyCarApp.PERMISSION_RECEIVE_MODULE"
+        android:protectionLevel="signature"/>
 
     <uses-feature
         android:name="android.hardware.type.automotive"
         android:required="true" />
+
+    <uses-permission android:name="android.car.permission.CONTROL_CAR_DOORS"/>
+    <uses-permission android:name="android.car.permission.CAR_VENDOR_EXTENSION"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.car.permission.CONTROL_CAR_FEATURES"/>
 
     <application
         android:allowBackup="true"
@@ -21,6 +31,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- ✅ Secure Broadcast Receiver -->
+        <receiver android:name=".core.ModuleBroadcastReceiver"
+            android:exported="true"
+            android:permission="com.MyCarApp.PERMISSION_RECEIVE_MODULE">
+            <intent-filter>
+                <action android:name="com.MyCarApp.ACTIVATE_MODULE"/>
+            </intent-filter>
+        </receiver>
 
     </application>
 
