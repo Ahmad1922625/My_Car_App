@@ -15,6 +15,7 @@
     <uses-permission android:name="android.car.permission.CONTROL_CAR_FEATURES"/>
 
     <application
+        android:name=".MyCarApp"
         android:allowBackup="true"
         android:appCategory="audio"
         android:icon="@mipmap/ic_launcher"
@@ -38,6 +39,8 @@
             android:permission="com.MyCarApp.PERMISSION_RECEIVE_MODULE">
             <intent-filter>
                 <action android:name="com.MyCarApp.ACTIVATE_MODULE"/>
+                <action android:name="com.MyCarApp.SET_DOOR_LOCK"/>
+                <action android:name="com.MyCarApp.SET_DOOR_MOVE"/>
             </intent-filter>
         </receiver>
 

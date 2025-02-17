@@ -1,47 +1,27 @@
 package com.MyCarApp.modules.door_control
 
+import android.util.Log
 import com.MyCarApp.core.OutputObject
 import com.MyCarApp.core.PropertyResult
 import com.MyCarApp.core.VehiclePropertyProvider
 import com.MyCarApp.modules.BaseModule
 
-/**
- * DoorControlModule handles door operations using VehiclePropertyProvider.
- * It wraps HAL calls into high-level methods:
- *  - getDoorState(): Retrieves lock status and door position.
- *  - unlockDoor(): Unlocks the driver's door.
- *  - openDoor(): Opens the driver's door and waits for movement to complete.
- *
- * After each action, notifyCompletion() is called.
- *
- * BEFORE TESTING:
- *  - Property IDs are set to: DOOR_LOCK = 371198722, DOOR_MOVE = 373295873.
- *  - The area ID is set to 0 for emulator compatibility.
- *  - Thread.sleep is used to simulate door movement callbacks.
- *
- * AFTER TESTING:
- *  - Replace Thread.sleep with a proper callback using CarPropertyManager.CarPropertyEventCallback.
- *  - Update the manifest with android.car.permission.CONTROL_CAR_DOORS.
- *  - Replace area ID with the appropriate value (e.g. VehicleAreaDoor.ROW_1_LEFT) for a real vehicle.
- *  - Handle vendor-specific configurations.
- *
- * Testing Coverage:
- *  - Write unit tests that mock VehiclePropertyProvider and verify calls to get/set property methods.
- *  - Validate that error cases (null/exception) produce error outputs.
- */
 open class DoorControlModule(private val propertyProvider: VehiclePropertyProvider) : BaseModule("door_control") {
 
-    // For testing: use area id 0 for emulator compatibility.
-    private val row1Left = 0
+    private val TAG = "DoorControlModule"
 
     companion object {
-        // For testing, use the following property IDs.
-        const val ID_DOOR_LOCK = 371198722  // Correct value for DOOR_LOCK
-        const val ID_DOOR_MOVE = 373295873  // Correct value for DOOR_MOVE
+        // ✅ Move driverDoorAreaId here so it's accessible statically
+        const val driverDoorAreaId = 1
+
+        // Property IDs
+        const val ID_DOOR_LOCK = 371198722
+        const val ID_DOOR_MOVE = 373295873
     }
 
     override fun execute(input: OutputObject?) {
-        println("Door Control Module: Executing...")
+        Log.d(TAG, "execute() called with input: $input")
+        // Assuming a successful recognition via input "MatchFound"
         if (input?.result == "MatchFound") {
             unlockDoor()
             openDoor()
@@ -52,23 +32,18 @@ open class DoorControlModule(private val propertyProvider: VehiclePropertyProvid
                 status = true,
                 additionalData = null
             )
+            Log.d(TAG, "Input did not contain MatchFound. Notifying completion with AccessDenied.")
             notifyCompletion(output)
         }
     }
 
-    /**
-     * Retrieves the door state by querying VehiclePropertyProvider.
-     * Returns lock status (Boolean) and door position (Int).
-     *
-     * Adds error handling for null or exception cases using PropertyResult.
-     */
     fun getDoorState(): OutputObject {
-        println("Door Control Module: Retrieving door state...")
+        Log.d(TAG, "Retrieving door state...")
         return try {
-            val lockStatus = propertyProvider.getDoorLockStatus(row1Left)
-            val doorPosition = propertyProvider.getDoorPosition(row1Left)
+            val lockStatus = propertyProvider.getDoorLockStatus(driverDoorAreaId)
+            val doorPosition = propertyProvider.getDoorPosition(driverDoorAreaId)
 
-            println("Door Control Module: Lock Status = $lockStatus, Door Position = $doorPosition")
+            Log.d(TAG, "Lock Status = $lockStatus, Door Position = $doorPosition")
 
             val additionalData: Map<String, PropertyResult<Any>> = mapOf(
                 "lockStatus" to (lockStatus?.let { PropertyResult.Success(it) }
@@ -82,11 +57,11 @@ open class DoorControlModule(private val propertyProvider: VehiclePropertyProvid
                 status = true,
                 additionalData = additionalData
             )
+            Log.d(TAG, "Notifying completion with DoorState.")
             notifyCompletion(output)
             output
         } catch (ex: Exception) {
-            println("Door Control Module: Error retrieving door state - ${ex.message}")
-
+            Log.e(TAG, "Error retrieving door state - ${ex.message}")
             val additionalData: Map<String, PropertyResult<Any>> = mapOf(
                 "exception" to PropertyResult.Error(ex.message ?: "Unknown error")
             )
@@ -96,34 +71,27 @@ open class DoorControlModule(private val propertyProvider: VehiclePropertyProvid
                 status = false,
                 additionalData = additionalData
             )
+            Log.d(TAG, "Notifying completion with door state error.")
             notifyCompletion(output)
             output
         }
     }
 
-
-    /**
-     * Unlocks the driver's door.
-     * Calls setDoorLock(false) on the VehiclePropertyProvider.
-     *
-     * Includes error handling using PropertyResult to produce an error output if an exception occurs.
-     */
     fun unlockDoor() {
-        println("Door Control Module: Unlocking door...")
+        Log.d(TAG, "unlockDoor() called")
         try {
-            propertyProvider.setDoorLock(row1Left, false)
-            println("Door Control Module: Door unlocked successfully.")
-
+            propertyProvider.setDoorLock(driverDoorAreaId, false)
+            Log.d(TAG, "Door unlocked successfully.")
             val output = OutputObject(
                 moduleId = moduleId,
                 result = "DoorUnlocked",
                 status = true,
                 additionalData = null
             )
+            Log.d(TAG, "Notifying completion with DoorUnlocked.")
             notifyCompletion(output)
         } catch (ex: Exception) {
-            println("Door Control Module: Failed to unlock door - ${ex.message}")
-
+            Log.e(TAG, "Failed to unlock door - ${ex.message}")
             val additionalData: Map<String, PropertyResult<Any>> = mapOf(
                 "exception" to PropertyResult.Error(ex.message ?: "Unknown error")
             )
@@ -133,32 +101,26 @@ open class DoorControlModule(private val propertyProvider: VehiclePropertyProvid
                 status = false,
                 additionalData = additionalData
             )
+            Log.d(TAG, "Notifying completion with door unlock error.")
             notifyCompletion(output)
         }
     }
 
-
-    /**
-     * Opens the driver's door.
-     * Calls setDoorMove(1) on the VehiclePropertyProvider and waits for movement to complete.
-     *
-     * Includes error handling using PropertyResult to produce an error output if an exception occurs.
-     */
     fun openDoor() {
-        println("Door Control Module: Opening door...")
+        Log.d(TAG, "openDoor() called")
         try {
-            propertyProvider.setDoorMove(row1Left, 1)
-            // Simulate waiting for door movement to complete.
-            Thread.sleep(500)
-            println("Door Control Module: Door movement complete.")
+            propertyProvider.setDoorMove(driverDoorAreaId, 1)
+            Log.d(TAG, "Door movement command issued.")
             val output = OutputObject(
                 moduleId = moduleId,
                 result = "DoorOpened",
                 status = true,
                 additionalData = null
             )
+            Log.d(TAG, "Notifying completion with DoorOpened.")
             notifyCompletion(output)
         } catch (ex: Exception) {
+            Log.e(TAG, "Error: Failed to open door - ${ex.message}")
             val additionalData: Map<String, PropertyResult<Any>> = mapOf(
                 "exception" to PropertyResult.Error(ex.message ?: "Unknown error")
             )
@@ -168,6 +130,7 @@ open class DoorControlModule(private val propertyProvider: VehiclePropertyProvid
                 status = false,
                 additionalData = additionalData
             )
+            Log.d(TAG, "Notifying completion with door open error.")
             notifyCompletion(output)
         }
     }

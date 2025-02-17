@@ -6,18 +6,14 @@ import android.content.ServiceConnection
 import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
-import android.widget.Button
-import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.MyCarApp.core.IntegrationClass
 import com.MyCarApp.core.ModuleBroadcastReceiver
-import com.MyCarApp.core.OutputObject
 import android.car.Car
 import android.car.hardware.property.CarPropertyManager
-import android.car.hardware.CarPropertyValue
+import android.content.Intent
 import android.os.Build
 import androidx.core.content.ContextCompat
-import com.MyCarApp.modules.door_control.DoorControlModule
 
 class MainActivity : AppCompatActivity() {
     private lateinit var integrationClass: IntegrationClass
@@ -34,7 +30,7 @@ class MainActivity : AppCompatActivity() {
                 integrationClass.setCarPropertyManager(carPropertyManager!!)
                 integrationClass.initModules()
 
-                // ✅ Register door lock callback through IntegrationClass
+                // Register door property callback through IntegrationClass
                 integrationClass.registerDoorPropertyCallback()
 
                 Log.d("MainActivity", "Car API successfully initialized.")
@@ -51,57 +47,66 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        val welcomeText = findViewById<TextView>(R.id.welcome_text)
-        val doorControlButton = findViewById<Button>(R.id.door_control_button)
-        val facialRecognitionButton = findViewById<Button>(R.id.facial_recognition_button)
-
         // Initialize Car API
         car = Car.createCar(this, serviceConnection)
         car?.connect()
 
-        // ✅ Register broadcast receiver for module execution
-        moduleBroadcastReceiver = ModuleBroadcastReceiver()
-        val intentFilter = IntentFilter("com.MyCarApp.ACTIVATE_MODULE")
+        // ✅ Ensure vehiclePropertyProvider is initialized ASAP
+        val integrationClass = IntegrationClass.getInstance()
+        val carManager = car?.getCarManager(Car.PROPERTY_SERVICE) as? CarPropertyManager
 
-// Fix: Use an explicit Int flag (0 for older versions)
-        val receiverFlag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            RECEIVER_NOT_EXPORTED
+        if (carManager != null) {
+            integrationClass.setCarPropertyManager(carManager)
+            Log.d("MainActivity", "✅ vehiclePropertyProvider manually initialized!")
         } else {
-            0 // Older versions use 0 (no flags)
+            Log.e("MainActivity", "❌ Failed to initialize CarPropertyManager.")
         }
+
+        // Register broadcast receiver for automatic module execution
+        moduleBroadcastReceiver = ModuleBroadcastReceiver()
+        val intentFilter = IntentFilter()
+        intentFilter.addAction("com.MyCarApp.ACTIVATE_MODULE")
+        intentFilter.addAction("com.MyCarApp.SET_DOOR_LOCK")
+        intentFilter.addAction("com.MyCarApp.SET_DOOR_MOVE")
+
+        Log.d("MainActivity", "Registering ModuleBroadcastReceiver with multiple actions...")
 
         ContextCompat.registerReceiver(
-            this, // Context
+            this,
             moduleBroadcastReceiver,
             intentFilter,
-            null, // No specific permission needed
-            null, // No scheduler
-            receiverFlag // ✅ Explicit int flag
+            null,
+            null,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                RECEIVER_NOT_EXPORTED
+            } else {
+                0
+            }
         )
 
+        // 🔥 Manually trigger ModuleBroadcastReceiver to check if it's working
+        Log.d("MainActivity", "🔥 Manually triggering ModuleBroadcastReceiver...")
 
+        val testIntent = Intent("com.MyCarApp.SET_DOOR_LOCK")
+        testIntent.putExtra("lock_state", true)
 
-        // Set up Door Control button click event
-        doorControlButton.setOnClickListener {
-            welcomeText.text = getString(R.string.door_control_clicked)
-            integrationClass.executeModule("door_control", OutputObject("door_control", "MatchFound", true))
-        }
+        ModuleBroadcastReceiver().onReceive(applicationContext, testIntent)
 
-        // Set up Facial Recognition button click event
-        facialRecognitionButton.setOnClickListener {
-            welcomeText.text = getString(R.string.facial_recognition_clicked)
-        }
+        Log.e("MainActivity", "🔥🔥🔥 Manually triggered ModuleBroadcastReceiver! 🔥🔥🔥")
+
+        // UI buttons removed; door control is now automatically triggered.
     }
+
 
     override fun onDestroy() {
         super.onDestroy()
         Log.d("MainActivity", "Unbinding Car service to prevent leaks.")
         car?.disconnect()
 
-        // ✅ Unregister broadcast receiver
+        // Unregister broadcast receiver
         unregisterReceiver(moduleBroadcastReceiver)
 
-        // ✅ Unregister door property callback
+        // Unregister door property callback
         integrationClass.unregisterDoorPropertyCallback()
     }
 }

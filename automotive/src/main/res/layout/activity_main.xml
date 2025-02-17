@@ -15,17 +15,5 @@
         android:textSize="18sp"
         android:gravity="center" />
 
-    <Button
-        android:id="@+id/door_control_button"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/door_control"
-        android:layout_marginTop="16dp" />
-
-    <Button
-        android:id="@+id/facial_recognition_button"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/facial_recognition"
-        android:layout_marginTop="16dp" />
+    <!-- UI buttons removed for door control as it is now automatically triggered -->
 </LinearLayout>

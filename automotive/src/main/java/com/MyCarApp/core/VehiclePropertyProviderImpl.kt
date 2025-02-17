@@ -2,116 +2,126 @@ package com.MyCarApp.core
 
 import android.car.hardware.property.CarPropertyManager
 import android.car.hardware.CarPropertyValue
+import android.content.Intent
+import android.util.Log
+import com.MyCarApp.MyCarApp
 import com.MyCarApp.modules.door_control.DoorControlModule
 
-/**
- * VehiclePropertyProviderImpl interfaces with CarPropertyManager to read/write car properties.
- * - Uses direct `getProperty/setProperty` for polling.
- * - ✅ Now includes `registerDoorPropertyCallback()` to listen for real-time updates.
- * - ✅ Added `isPropertyAvailable()` to check if a property can be accessed.
- * - ✅ Improved logging for debugging.
- */
 class VehiclePropertyProviderImpl(private val carPropertyManager: CarPropertyManager) : VehiclePropertyProvider {
 
-    /**
-     * Retrieves the door lock status (true/false) or returns null if unavailable.
-     */
+    private val TAG = "VehiclePropertyProviderImpl"
+    private var doorLockCallback: CarPropertyManager.CarPropertyEventCallback? = null
+
     override fun getDoorLockStatus(areaId: Int): Boolean? {
         return try {
             if (!isPropertyAvailable(DoorControlModule.ID_DOOR_LOCK, areaId)) {
-                println("VehiclePropertyProviderImpl: DOOR_LOCK is unavailable.")
+                Log.d(TAG, "DOOR_LOCK is unavailable.")
                 return null
             }
             val value = carPropertyManager.getBooleanProperty(DoorControlModule.ID_DOOR_LOCK, areaId)
-            println("VehiclePropertyProviderImpl: DOOR_LOCK read as $value")
+            Log.d(TAG, "DOOR_LOCK read as $value")
             value
         } catch (e: Exception) {
-            println("VehiclePropertyProviderImpl: Failed to read DOOR_LOCK - ${e.message}")
+            Log.e(TAG, "Failed to read DOOR_LOCK - ${e.message}")
             null
         }
     }
 
-    /**
-     * Retrieves the door position (int) or returns null if unavailable.
-     */
     override fun getDoorPosition(areaId: Int): Int? {
         return try {
             if (!isPropertyAvailable(DoorControlModule.ID_DOOR_MOVE, areaId)) {
-                println("VehiclePropertyProviderImpl: DOOR_MOVE is unavailable.")
+                Log.d(TAG, "DOOR_MOVE is unavailable.")
                 return null
             }
-            val value = carPropertyManager.getIntProperty(DoorControlModule.ID_DOOR_MOVE, areaId)
-            println("VehiclePropertyProviderImpl: DOOR_MOVE read as $value")
-            value
+            carPropertyManager.getIntProperty(DoorControlModule.ID_DOOR_MOVE, areaId).also {
+                Log.d(TAG, "DOOR_MOVE read as $it")
+            }
         } catch (e: Exception) {
-            println("VehiclePropertyProviderImpl: Failed to read DOOR_MOVE - ${e.message}")
+            Log.e(TAG, "Failed to read DOOR_MOVE - ${e.message}")
             null
         }
     }
 
-    /**
-     * Sets the door lock state (true = locked, false = unlocked).
-     */
+
     override fun setDoorLock(areaId: Int, lock: Boolean) {
         try {
+            Log.e("VehiclePropertyProviderImpl", "🚨 setDoorLock() received lock = $lock")
             if (!isPropertyAvailable(DoorControlModule.ID_DOOR_LOCK, areaId)) {
-                println("VehiclePropertyProviderImpl: Cannot write DOOR_LOCK, property is unavailable.")
+                Log.e("VehiclePropertyProviderImpl", "❌ DOOR_LOCK property is unavailable!")
                 return
             }
+
+            Log.d("VehiclePropertyProviderImpl", "🔥 Writing DOOR_LOCK to $lock for area ID: $areaId")
             carPropertyManager.setBooleanProperty(DoorControlModule.ID_DOOR_LOCK, areaId, lock)
-            println("VehiclePropertyProviderImpl: DOOR_LOCK successfully set to $lock")
+
+            // Try enforcing the value continuously
+            Thread {
+                repeat(10) { i ->
+                    Thread.sleep(500) // Small delay to let changes register
+                    val currentLockState = carPropertyManager.getBooleanProperty(DoorControlModule.ID_DOOR_LOCK, areaId)
+                    if (currentLockState != lock) {
+                        Log.e("VehiclePropertyProviderImpl", "🚨 DOOR_LOCK overridden at attempt $i! Re-setting to $lock")
+                        carPropertyManager.setBooleanProperty(DoorControlModule.ID_DOOR_LOCK, areaId, lock)
+                    } else {
+                        Log.d("VehiclePropertyProviderImpl", "✅ DOOR_LOCK remains at $lock")
+                    }
+                }
+            }.start()
+
         } catch (e: Exception) {
-            println("VehiclePropertyProviderImpl: Failed to set DOOR_LOCK - ${e.message}")
+            Log.e("VehiclePropertyProviderImpl", "Failed to set DOOR_LOCK - ${e.message}")
         }
     }
 
-    /**
-     * Sets the door movement state (1 = open, 0 = stop, -1 = close).
-     */
+
+
+
+
+
     override fun setDoorMove(areaId: Int, value: Int) {
         try {
             if (!isPropertyAvailable(DoorControlModule.ID_DOOR_MOVE, areaId)) {
-                println("VehiclePropertyProviderImpl: Cannot write DOOR_MOVE, property is unavailable.")
+                Log.d(TAG, "Cannot write DOOR_MOVE, property is unavailable.")
                 return
             }
             carPropertyManager.setIntProperty(DoorControlModule.ID_DOOR_MOVE, areaId, value)
-            println("VehiclePropertyProviderImpl: DOOR_MOVE successfully set to $value")
+            Log.d(TAG, "DOOR_MOVE successfully set to $value")
+
+            // ✅ Send broadcast to notify other components
+            val intent = Intent("com.MyCarApp.SET_DOOR_MOVE")
+            intent.putExtra("door_move_value", value)
+            Log.d(TAG, "Broadcasting SET_DOOR_MOVE with value: $value")
+            MyCarApp.appContext.sendBroadcast(intent)
+
         } catch (e: Exception) {
-            println("VehiclePropertyProviderImpl: Failed to set DOOR_MOVE - ${e.message}")
+            Log.e(TAG, "Failed to set DOOR_MOVE - ${e.message}")
         }
     }
 
-    /**
-     * ✅ Registers a callback to listen for DOOR_LOCK updates in real-time.
-     */
+
     fun registerDoorPropertyCallback() {
-        carPropertyManager.registerCallback(object : CarPropertyManager.CarPropertyEventCallback {
+        doorLockCallback = object : CarPropertyManager.CarPropertyEventCallback {
             override fun onChangeEvent(value: CarPropertyValue<*>) {
-                println("VehiclePropertyProviderImpl: DOOR_LOCK changed to ${value.value}")
+                Log.e("VehiclePropertyProviderImpl", "🚨 DOOR_LOCK CHANGED! New Value: $value")
+                Log.d("VehiclePropertyProviderImpl", "🔍 Property change triggered by: ${Thread.currentThread().stackTrace.joinToString("\n")}")
             }
 
             override fun onErrorEvent(propertyId: Int, areaId: Int) {
-                println("VehiclePropertyProviderImpl: Error accessing property: $propertyId")
+                Log.d(TAG, "Error accessing property: $propertyId")
             }
-        }, DoorControlModule.ID_DOOR_LOCK, CarPropertyManager.SENSOR_RATE_ONCHANGE)
-
-        println("VehiclePropertyProviderImpl: Registered callback for DOOR_LOCK")
+        }
+        carPropertyManager.registerCallback(doorLockCallback!!, DoorControlModule.ID_DOOR_LOCK, CarPropertyManager.SENSOR_RATE_ONCHANGE)
+        Log.d(TAG, "Registered callback for DOOR_LOCK")
     }
 
-    /**
-     * ✅ Unregisters the callback to prevent memory leaks.
-     */
     fun unregisterDoorPropertyCallback() {
-        carPropertyManager.unregisterCallback(object : CarPropertyManager.CarPropertyEventCallback {
-            override fun onChangeEvent(value: CarPropertyValue<*>) {}
-            override fun onErrorEvent(propertyId: Int, areaId: Int) {}
-        })
-        println("VehiclePropertyProviderImpl: Unregistered callback for DOOR_LOCK")
+        doorLockCallback?.let {
+            carPropertyManager.unregisterCallback(it, DoorControlModule.ID_DOOR_LOCK)
+            Log.d(TAG, "Unregistered callback for DOOR_LOCK")
+            doorLockCallback = null
+        } ?: Log.d(TAG, "No callback to unregister for DOOR_LOCK")
     }
 
-    /**
-     * ✅ Checks if a car property is available before accessing it.
-     */
     private fun isPropertyAvailable(propertyId: Int, areaId: Int): Boolean {
         return carPropertyManager.isPropertyAvailable(propertyId, areaId)
     }
