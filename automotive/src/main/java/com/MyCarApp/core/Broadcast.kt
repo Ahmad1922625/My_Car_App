@@ -86,21 +86,11 @@ class ModuleBroadcastReceiver : BroadcastReceiver() {
 
                 Log.e("ModuleBroadcastReceiver", "🚨 Final extracted lock_state = $lockState")
 
-                // ✅ Check if IntegrationClass and vehiclePropertyProvider exist
-                val integrationClass = IntegrationClass.getInstance()
-                if (integrationClass == null) {
-                    Log.e("ModuleBroadcastReceiver", "❌ IntegrationClass instance is NULL!")
-                    return
-                }
+                // 🚨 NEW: Forward the request to IntegrationClass instead of calling setDoorLock() directly
+                integrationClass.executeModule("door_control")
 
-                val vehiclePropertyProvider = integrationClass.getVehiclePropertyProvider()
-                if (vehiclePropertyProvider == null) {
-                    Log.e("ModuleBroadcastReceiver", "❌ vehiclePropertyProvider is NULL!")
-                    return
-                }
-
-                Log.d("ModuleBroadcastReceiver", "✅ Calling setDoorLock() with lockState: $lockState...")
-                vehiclePropertyProvider.setDoorLock(DoorControlModule.driverDoorAreaId, lockState)
+                // 🚨 REMOVED: Direct call to vehiclePropertyProvider.setDoorLock()
+                // vehiclePropertyProvider.setDoorLock(DoorControlModule.driverDoorAreaId, lockState)
             }
 
 
