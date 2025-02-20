@@ -54,24 +54,22 @@ class VehiclePropertyProviderImpl(private val carPropertyManager: CarPropertyMan
             Log.d("VehiclePropertyProviderImpl", "🔥 Writing DOOR_LOCK to $lock for area ID: $areaId")
             carPropertyManager.setBooleanProperty(DoorControlModule.ID_DOOR_LOCK, areaId, lock)
 
-            // Try enforcing the value continuously
-            Thread {
-                repeat(10) { i ->
-                    Thread.sleep(500) // Small delay to let changes register
-                    val currentLockState = carPropertyManager.getBooleanProperty(DoorControlModule.ID_DOOR_LOCK, areaId)
-                    if (currentLockState != lock) {
-                        Log.e("VehiclePropertyProviderImpl", "🚨 DOOR_LOCK overridden at attempt $i! Re-setting to $lock")
-                        carPropertyManager.setBooleanProperty(DoorControlModule.ID_DOOR_LOCK, areaId, lock)
-                    } else {
-                        Log.d("VehiclePropertyProviderImpl", "✅ DOOR_LOCK remains at $lock")
-                    }
-                }
-            }.start()
+            // Wait 1 second and check again
+            Thread.sleep(1000)
+            val newValue = carPropertyManager.getBooleanProperty(DoorControlModule.ID_DOOR_LOCK, areaId)
+            Log.e("VehiclePropertyProviderImpl", "🔥 DOOR_LOCK after 1s: $newValue (Expected: $lock)")
+
+            if (newValue == lock) {
+                Log.d("VehiclePropertyProviderImpl", "✅ DOOR_LOCK successfully updated!")
+            } else {
+                Log.e("VehiclePropertyProviderImpl", "❌ DOOR_LOCK was overridden! Expected: $lock, Read: $newValue")
+            }
 
         } catch (e: Exception) {
             Log.e("VehiclePropertyProviderImpl", "Failed to set DOOR_LOCK - ${e.message}")
         }
     }
+
 
 
 

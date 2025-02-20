@@ -10,7 +10,6 @@
         android:required="true" />
 
     <uses-permission android:name="android.car.permission.CONTROL_CAR_DOORS"/>
-    <uses-permission android:name="android.car.permission.CAR_VENDOR_EXTENSION"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.car.permission.CONTROL_CAR_FEATURES"/>
 
