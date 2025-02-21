@@ -1,137 +1,134 @@
 package com.MyCarApp.modules.door_control
 
 import android.util.Log
+import android.car.VehiclePropertyIds
+import android.car.hardware.property.CarPropertyManager
 import com.MyCarApp.core.OutputObject
 import com.MyCarApp.core.PropertyResult
-import com.MyCarApp.core.VehiclePropertyProvider
 import com.MyCarApp.modules.BaseModule
 
-open class DoorControlModule(private val propertyProvider: VehiclePropertyProvider) : BaseModule("door_control") {
+open class DoorControlModule(private val carPropertyManager: CarPropertyManager) : BaseModule("door_control") {
 
     private val TAG = "DoorControlModule"
 
-    companion object {
-        // ✅ Move driverDoorAreaId here so it's accessible statically
-        const val driverDoorAreaId = 1
-
-        // Property IDs
-        const val ID_DOOR_LOCK = 371198722
-        const val ID_DOOR_MOVE = 373295873
-    }
-
-    override fun execute(input: OutputObject?) {
+    override fun execute(input: OutputObject?): OutputObject {
         Log.d(TAG, "execute() called with input: $input")
-        // Assuming a successful recognition via input "MatchFound"
-        if (input?.result == "MatchFound") {
-            unlockDoor()
-            openDoor()
+
+        return if (input?.result == "MatchFound") {
+            unlockDoor() // ✅ Ensures function always returns an `OutputObject`
         } else {
-            val output = OutputObject(
+            OutputObject(
                 moduleId = moduleId,
                 result = "AccessDenied",
-                status = true,
-                additionalData = null
+                status = false
             )
-            Log.d(TAG, "Input did not contain MatchFound. Notifying completion with AccessDenied.")
-            notifyCompletion(output)
         }
     }
 
-    fun getDoorState(): OutputObject {
-        Log.d(TAG, "Retrieving door state...")
+    fun getDoorState(areaId: Int = VehicleAreaDoor.ROW_1_LEFT): OutputObject {
+        Log.d(TAG, "Retrieving door state for area ID: $areaId")
+
         return try {
-            val lockStatus = propertyProvider.getDoorLockStatus(driverDoorAreaId)
-            val doorPosition = propertyProvider.getDoorPosition(driverDoorAreaId)
+            // ✅ Dynamically fetch lock status and door position
+            val lockStatus = carPropertyManager.getBooleanProperty(VehiclePropertyIds.DOOR_LOCK, areaId)
+            val doorPosition = carPropertyManager.getIntProperty(VehiclePropertyIds.DOOR_MOVE, areaId)
 
             Log.d(TAG, "Lock Status = $lockStatus, Door Position = $doorPosition")
 
             val additionalData: Map<String, PropertyResult<Any>> = mapOf(
-                "lockStatus" to (lockStatus?.let { PropertyResult.Success(it) }
-                    ?: PropertyResult.Error("Lock status not available")),
-                "doorPosition" to (doorPosition?.let { PropertyResult.Success(it) }
-                    ?: PropertyResult.Error("Door position not available"))
+                "lockStatus" to PropertyResult.Success(lockStatus),
+                "doorPosition" to PropertyResult.Success(doorPosition)
             )
-            val output = OutputObject(
+
+            // ✅ Notify completion and return OutputObject
+            OutputObject(
                 moduleId = moduleId,
                 result = "DoorState",
                 status = true,
                 additionalData = additionalData
-            )
-            Log.d(TAG, "Notifying completion with DoorState.")
-            notifyCompletion(output)
-            output
+            ).also { notifyCompletion(it) }
+
         } catch (ex: Exception) {
-            Log.e(TAG, "Error retrieving door state - ${ex.message}")
-            val additionalData: Map<String, PropertyResult<Any>> = mapOf(
-                "exception" to PropertyResult.Error(ex.message ?: "Unknown error")
-            )
-            val output = OutputObject(
+            Log.e(TAG, "Error retrieving door state for area ID $areaId - ${ex.message}")
+
+            OutputObject(
                 moduleId = moduleId,
                 result = "Error: Exception retrieving door state",
                 status = false,
-                additionalData = additionalData
-            )
-            Log.d(TAG, "Notifying completion with door state error.")
-            notifyCompletion(output)
-            output
+                additionalData = mapOf(
+                    "exception" to PropertyResult.Error(ex.message ?: "Unknown error")
+                )
+            ).also { notifyCompletion(it) }
         }
     }
 
-    fun unlockDoor() {
-        Log.d(TAG, "unlockDoor() called")
-        try {
-            propertyProvider.setDoorLock(driverDoorAreaId, false)
-            Log.d(TAG, "Door unlocked successfully.")
-            val output = OutputObject(
+    fun unlockDoor(areaId: Int = VehicleAreaDoor.ROW_1_LEFT): OutputObject {
+        Log.d(TAG, "unlockDoor() called for area ID: $areaId")
+
+        return try {
+            // ✅ Unlock dynamically based on area ID
+            carPropertyManager.setBooleanProperty(VehiclePropertyIds.DOOR_LOCK, areaId, false)
+
+            OutputObject(
                 moduleId = moduleId,
                 result = "DoorUnlocked",
-                status = true,
-                additionalData = null
+                status = true
             )
-            Log.d(TAG, "Notifying completion with DoorUnlocked.")
-            notifyCompletion(output)
+
         } catch (ex: Exception) {
-            Log.e(TAG, "Failed to unlock door - ${ex.message}")
-            val additionalData: Map<String, PropertyResult<Any>> = mapOf(
-                "exception" to PropertyResult.Error(ex.message ?: "Unknown error")
-            )
-            val output = OutputObject(
+            Log.e(TAG, "Failed to unlock door for area ID $areaId - ${ex.message}")
+
+            OutputObject(
                 moduleId = moduleId,
                 result = "Error: Failed to unlock door",
-                status = false,
-                additionalData = additionalData
+                status = false
             )
-            Log.d(TAG, "Notifying completion with door unlock error.")
-            notifyCompletion(output)
         }
     }
 
-    fun openDoor() {
-        Log.d(TAG, "openDoor() called")
-        try {
-            propertyProvider.setDoorMove(driverDoorAreaId, 1)
-            Log.d(TAG, "Door movement command issued.")
-            val output = OutputObject(
+    fun openDoor(areaId: Int = VehicleAreaDoor.ROW_1_LEFT): OutputObject {
+        Log.d(TAG, "openDoor() called for area ID: $areaId")
+
+        return try {
+            // ✅ Dynamically open door based on area ID
+            carPropertyManager.setIntProperty(VehiclePropertyIds.DOOR_MOVE, areaId, 1)
+
+            OutputObject(
                 moduleId = moduleId,
                 result = "DoorOpened",
-                status = true,
-                additionalData = null
+                status = true
             )
-            Log.d(TAG, "Notifying completion with DoorOpened.")
-            notifyCompletion(output)
+
         } catch (ex: Exception) {
-            Log.e(TAG, "Error: Failed to open door - ${ex.message}")
-            val additionalData: Map<String, PropertyResult<Any>> = mapOf(
-                "exception" to PropertyResult.Error(ex.message ?: "Unknown error")
-            )
-            val output = OutputObject(
+            Log.e(TAG, "Failed to open door for area ID $areaId - ${ex.message}")
+
+            OutputObject(
                 moduleId = moduleId,
                 result = "Error: Failed to open door",
-                status = false,
-                additionalData = additionalData
+                status = false
             )
-            Log.d(TAG, "Notifying completion with door open error.")
-            notifyCompletion(output)
         }
+    }
+
+    fun registerDoorPropertyCallback(areaId: Int = VehicleAreaDoor.ROW_1_LEFT) {
+        // ✅ Register callback dynamically for specific door
+        carPropertyManager.registerCallback(carPropertyListener, VehiclePropertyIds.DOOR_LOCK, CarPropertyManager.SENSOR_RATE_ONCHANGE)
+        Log.d(TAG, "Registered callback for DOOR_LOCK on area ID: $areaId")
+    }
+
+    private val carPropertyListener = object : CarPropertyManager.CarPropertyEventCallback {
+        override fun onChangeEvent(value: android.car.hardware.CarPropertyValue<*>) {
+            Log.d(TAG, "🚨 Property changed: ${value.propertyId}, New Value: ${value.value}")
+        }
+
+        override fun onErrorEvent(propertyId: Int, areaId: Int) {
+            Log.d(TAG, "Error accessing property: $propertyId for area ID: $areaId")
+        }
+    }
+    object VehicleAreaDoor {
+        const val ROW_1_LEFT = 0x1
+        const val ROW_1_RIGHT = 0x4
+        const val ROW_2_LEFT = 0x10
+        const val ROW_2_RIGHT = 0x40
     }
 }

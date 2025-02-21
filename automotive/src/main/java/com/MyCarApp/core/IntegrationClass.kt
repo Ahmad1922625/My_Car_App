@@ -1,5 +1,6 @@
 package com.MyCarApp.core
 
+import android.car.VehiclePropertyIds
 import android.car.hardware.property.CarPropertyManager
 import android.util.Log
 import com.MyCarApp.modules.BaseModule
@@ -9,27 +10,33 @@ class IntegrationClass {
 
     private val moduleRegistry: MutableMap<String, BaseModule> = mutableMapOf()
     private var carPropertyManager: CarPropertyManager? = null
-    private var vehiclePropertyProvider: VehiclePropertyProviderImpl? = null
 
     fun setCarPropertyManager(manager: CarPropertyManager) {
         this.carPropertyManager = manager
-        this.vehiclePropertyProvider = VehiclePropertyProviderImpl(manager)
     }
 
     fun initModules() {
         Log.d("IntegrationClass", "Initializing modules...")
+
         if (!moduleRegistry.containsKey("door_control") && carPropertyManager != null) {
-            // Use the stored vehiclePropertyProvider instance.
-            registerModule("door_control", DoorControlModule(vehiclePropertyProvider!!))
+            val doorModule = DoorControlModule(carPropertyManager!!)
+            registerModule("door_control", doorModule)
+
+            // ✅ Register property callback here
+            doorModule.registerDoorPropertyCallback()
         }
+
         moduleRegistry.keys.forEach { id ->
             Log.d("IntegrationClass", "Module registered: $id")
         }
+
         if (carPropertyManager == null) {
             Log.w("IntegrationClass", "carPropertyManager is null. Skipping door_control registration.")
         }
+
         Log.d("IntegrationClass", "All modules initialized successfully.")
     }
+
 
     fun registerModule(id: String, module: BaseModule) {
         if (moduleRegistry.containsKey(id)) {
@@ -49,28 +56,10 @@ class IntegrationClass {
 
         Log.d("IntegrationClass", "Executing module: $id with input: $input")
 
-        // 🔹 Check if this is a door control action
-        if (id == "door_control" && input == null) {
-            Log.w("IntegrationClass", "Executing door_control without input. Checking broadcasts...")
+        val output = module.execute(input) // ✅ `execute()` always returns an `OutputObject`
 
-            // Try fetching values from broadcasts if available
-            val lockState = ModuleBroadcastReceiver.lastLockState
-            val moveValue = ModuleBroadcastReceiver.lastMoveValue
-
-            if (lockState != null) {
-                Log.d("IntegrationClass", "Applying last received DOOR_LOCK state: $lockState")
-                vehiclePropertyProvider?.setDoorLock(DoorControlModule.driverDoorAreaId, lockState)
-            }
-
-            if (moveValue != null) {
-                Log.d("IntegrationClass", "Applying last received DOOR_MOVE value: $moveValue")
-                vehiclePropertyProvider?.setDoorMove(DoorControlModule.driverDoorAreaId, moveValue)
-            }
-        }
-
-        module.execute(input)
+        notifyModuleCompleted(id, output)
     }
-
 
     fun notifyModuleCompleted(id: String, output: OutputObject) {
         Log.d("IntegrationClass", "Module '$id' completed with output: $output")
@@ -84,24 +73,25 @@ class IntegrationClass {
         }
     }
 
-    fun setVehiclePropertyProvider(provider: VehiclePropertyProvider) {
-        if (!moduleRegistry.containsKey("door_control")) {
-            registerModule("door_control", DoorControlModule(provider))
-        }
-    }
-
     fun registerDoorPropertyCallback() {
-        vehiclePropertyProvider?.registerDoorPropertyCallback()
+        carPropertyManager?.registerCallback(carPropertyListener, VehiclePropertyIds.DOOR_LOCK, CarPropertyManager.SENSOR_RATE_ONCHANGE)
+        Log.d("IntegrationClass", "Registered callback for DOOR_LOCK")
     }
 
     fun unregisterDoorPropertyCallback() {
-        vehiclePropertyProvider?.unregisterDoorPropertyCallback()
+        carPropertyManager?.unregisterCallback(carPropertyListener, VehiclePropertyIds.DOOR_LOCK)
+        Log.d("IntegrationClass", "Unregistered callback for DOOR_LOCK")
     }
 
-    fun getVehiclePropertyProvider(): VehiclePropertyProviderImpl? {
-        return vehiclePropertyProvider
-    }
+    private val carPropertyListener = object : CarPropertyManager.CarPropertyEventCallback {
+        override fun onChangeEvent(value: android.car.hardware.CarPropertyValue<*>) {
+            Log.d("IntegrationClass", "🚨 Property changed: ${value.propertyId}, New Value: ${value.value}")
+        }
 
+        override fun onErrorEvent(propertyId: Int, areaId: Int) {
+            Log.d("IntegrationClass", "Error accessing property: $propertyId")
+        }
+    }
 
     companion object {
         private var instance: IntegrationClass? = null
